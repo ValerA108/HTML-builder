@@ -66,43 +66,68 @@ async function mergeStyles() {
       }
     }
 
-    // // Создаем директорию project-dist, если она не существует
-    // await FS.promises.mkdir(DIST_DIR, { recursive: true });
-
     // Записываем все стили в файл bundle.css
     await FS.promises.writeFile(BUNDLE_PATH, stylesContent);
 
-    console.log("Стиль объединен и записан в bundle.css");
+    console.log("Стили объединены и записаны в bundle.css");
   } catch (err) {
     console.error("Ошибка при объединении стилей:", err);
   }
 }
 
-async function copyDir(SRC, DEST) {
+// Функция для рекурсивного копирования папки assets
+async function copyAssets() {
   try {
-    // Создаём папку назначения, если её нет
-    await FS.promises.mkdir(DEST, { recursive: true });
+    const assetFiles = await FS.promises.readdir(ASSETS_DIR, {
+      withFileTypes: true,
+    });
 
-    // Читаем содержимое исходной папки
-    const ITEMS = await FS.promises.readdir(SRC, { withFileTypes: true });
+    // Создаем папку assets в проекте, если она еще не существует
+    await FS.promises.mkdir(PATH.join(DIST_DIR, "assets"), { recursive: true });
 
-    for (let ITEM of ITEMS) {
-      const SRC_PATH = PATH.join(SRC, ITEM.name); // Путь к исходному объекту
-      const DEST_PATH = PATH.join(DIST_DIR, "assets", ITEM.name); // Путь к целевому объекту
+    // Проходим по всем файлам и папкам в папке assets
+    for (let file of assetFiles) {
+      const srcPath = PATH.join(ASSETS_DIR, file.name); // Исходный путь
+      const destPath = PATH.join(DIST_DIR, "assets", file.name); // Путь назначения
 
-      if (ITEM.isDirectory()) {
-        // Если это директория, рекурсивно копируем
-        await FS.promises.mkdir(DEST_PATH, { recursive: true });
-        await copyDir(SRC_PATH, DEST_PATH);
+      if (file.isDirectory()) {
+        // Если это директория, рекурсивно копируем её содержимое
+        await copyDirectory(srcPath, destPath);
       } else {
-        // Если это файл, просто копируем
-        await FS.promises.copyFile(SRC_PATH, DEST_PATH);
+        // Если это файл, просто копируем его
+        await FS.promises.copyFile(srcPath, destPath);
       }
     }
 
     console.log("Папка assets скопирована!");
-  } catch (ERR) {
-    console.error("Ошибка при копировании:", ERR);
+  } catch (err) {
+    console.error("Ошибка при копировании папки assets:", err);
+  }
+}
+
+// Функция для рекурсивного копирования содержимого папки
+async function copyDirectory(srcDir, destDir) {
+  try {
+    // Создаем директорию, если она не существует
+    await FS.promises.mkdir(destDir, { recursive: true });
+
+    const files = await FS.promises.readdir(srcDir, { withFileTypes: true });
+
+    // Проходим по всем файлам и папкам в текущей директории
+    for (const file of files) {
+      const srcPath = PATH.join(srcDir, file.name);
+      const destPath = PATH.join(destDir, file.name);
+
+      if (file.isDirectory()) {
+        // Если это директория, рекурсивно копируем её
+        await copyDirectory(srcPath, destPath);
+      } else {
+        // Если это файл, копируем его
+        await FS.promises.copyFile(srcPath, destPath);
+      }
+    }
+  } catch (err) {
+    console.error("Ошибка при копировании директории:", err);
   }
 }
 
@@ -131,18 +156,17 @@ async function clearDir(DEST) {
 }
 
 // Главная функция
-async function main() {
+async function Builder() {
+  await clearDir(DIST_DIR);
+
+  console.log("Папка проекта очищена!");
+
   await createDistFolder();
   await createHtml();
   await mergeStyles();
+  await copyAssets();
 
-  // Очищаем папку назначения
-  // await clearDir(DIST_DIR);
-
-  // Копируем файлы и папки
-  await copyDir(ASSETS_DIR, DIST_DIR);
-
-  // console.log("Копирование завершено!");
+  console.log("Cоздание завершено!");
 }
 
-main();
+Builder();
